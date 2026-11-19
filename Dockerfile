@@ -1,6 +1,6 @@
 FROM docker.io/cloudflare/sandbox:0.7.20
 
-# Install Node.js 24 (required by latest OpenClaw releases)
+# Install Node.js 24 & upgrade npm to v12 (required by latest OpenClaw)
 ENV NODE_VERSION=24.22.1
 RUN ARCH="$(dpkg --print-architecture)" \
     && case "${ARCH}" in \
@@ -9,17 +9,20 @@ RUN ARCH="$(dpkg --print-architecture)" \
          *) echo "Unsupported architecture: ${ARCH}" >&2; exit 1 ;; \
        esac \
     && apt-get update && apt-get install -y xz-utils ca-certificates \
-    && rm -rf /usr/local/lib/node_modules /usr/local/bin/node /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+    && rm -rf /usr/local/lib/node_modules /usr/local/bin/node /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /usr/local/bin/openclaw \
     && curl -fsSLk https://nodejs.org{NODE_VERSION}/node-v${NODE_VERSION}-linux-${NODE_ARCH}.tar.xz -o /tmp/node.tar.xz \
     && tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 \
     && rm /tmp/node.tar.xz \
+    && npm install -g npm@12.2.3 \
     && node --version \
     && npm --version
 
-# Force cache bust & install latest stable OpenClaw (2026.11.3)
-ARG CACHE_BUST=2026-11-19-03-20
-RUN npm cache clean --force \
-    && npm install -g openclaw@2026.11.3 \
+# Clean any pre-installed openclaw binary and install 2026.11.3
+ARG CACHE_BUST=2026-11-19-clean-install-v2
+RUN npm uninstall -g openclaw || true \
+    && rm -f /usr/bin/openclaw /usr/local/bin/openclaw \
+    && npm install -g openclaw@2026.11.3 --allow-scripts=openclaw \
+    && which openclaw \
     && openclaw --version
 
 # Use /home/openclaw as the home directory instead of /root.
